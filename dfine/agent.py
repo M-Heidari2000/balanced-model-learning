@@ -67,11 +67,7 @@ class LQRAgent:
         c = torch.zeros((state_dim + action_dim, 1), device=self.device)
 
         F = torch.cat((self.dfine.A, self.dfine.B), dim=1)
-        f = (
-            self.dfine.o
-            + (self.dfine.A - torch.eye(state_dim, device=self.device))
-            @ self.cost_function.target.T
-        )
+        f = (self.dfine.A - torch.eye(state_dim, device=self.device))@ self.cost_function.target.T
 
         for _ in range(self.planning_horizon-1, -1, -1):
             Q = C + F.T @ V @ F
