@@ -89,8 +89,8 @@ def train(env: gym.Env, config: TrainConfig):
         )
 
         raw_observations = torch.as_tensor(raw_observations, device=device)
-        raw_observations = einops.rearrange(raw_observations, 'b l o -> (b l) o')
-        observations = encoder(raw_observations)
+        raw_observations = einops.rearrange(raw_observations, 'b l o -> l b o')
+        observations = encoder(einops.rearrange(raw_observations, 'l b o -> (l b) o'))
         observations = einops.rearrange(observations, '(b l) o -> l b o', b=config.batch_size)
         actions = torch.as_tensor(actions, device=device)
         actions = einops.rearrange(actions, 'b l a -> l b a')
@@ -141,6 +141,7 @@ def train(env: gym.Env, config: TrainConfig):
 
     
     torch.save(encoder.state_dict(), log_dir / "encoder.pth")
+    torch.save(decoder.state_dict(), log_dir / "decoder.pth")
     torch.save(dfine.state_dict(), log_dir / "dfine.pth")
 
     return {"model_dir": log_dir}
