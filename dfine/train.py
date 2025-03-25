@@ -12,6 +12,7 @@ from .memory import ReplayBuffer
 from .configs import TrainConfig
 from .models import (
     Encoder,
+    Decoder,
     Dfine,
 )
 
@@ -48,6 +49,12 @@ def train(env: gym.Env, config: TrainConfig):
         hidden_dim=config.hidden_dim
     ).to(device)
 
+    decoder = Decoder(
+        raw_obs_dim=env.observation_space.shape[0],
+        obs_dim=config.obs_dim,
+        hidden_dim=config.hidden_dim
+    ).to(device)
+
     dfine = Dfine(
         state_dim=config.state_dim,
         action_dim=env.action_space.shape[0],
@@ -57,6 +64,7 @@ def train(env: gym.Env, config: TrainConfig):
 
     all_params = (
         list(encoder.parameters()) +
+        list(decoder.parameters()) + 
         list(dfine.parameters())
     )
 
@@ -104,7 +112,7 @@ def train(env: gym.Env, config: TrainConfig):
                 obs=observations[t+1],
             )
 
-            pred_obs = torch.zeros((config.prediction_k, config.batch_size, config.obs_dim), device=device)
+            pred_raw_obs = torch.zeros((config.prediction_k, config.batch_size, env.observation_space.shape[0]), device=device)
 
             pred_mean = mean
             pred_cov = cov
@@ -115,13 +123,13 @@ def train(env: gym.Env, config: TrainConfig):
                     cov=pred_cov,
                     action=actions[t+k+1]
                 )
-                pred_obs[k] = pred_mean @ dfine.C.T
+                pred_raw_obs[k] = decoder(pred_mean @ dfine.C.T)
 
-            true_obs = observations[t+2: t+2+config.prediction_k]
-            true_obs_flatten = einops.rearrange(true_obs, "k b o -> (k b) o")
-            pred_obs_flatten = einops.rearrange(pred_obs, "k b o -> (k b) o")
+            true_raw_obs = raw_observations[t+2: t+2+config.prediction_k]
+            true_raw_obs_flatten = einops.rearrange(true_raw_obs, "k b o -> (k b) o")
+            pred_raw_obs_flatten = einops.rearrange(pred_raw_obs, "k b o -> (k b) o")
 
-            total_loss += criterion(pred_obs_flatten, true_obs_flatten)
+            total_loss += criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
 
         optimizer.zero_grad()
         total_loss.backward()
