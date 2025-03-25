@@ -23,7 +23,7 @@ class LQRAgent:
         self.step = 0
 
         self.mean = torch.zeros((1, self.dfine.state_dim), device=self.device)
-        self.cov = torch.eye(self.dfine.state_dim, device=self.device)
+        self.cov = torch.eye(self.dfine.state_dim, device=self.device).unsqueeze(0)
 
     def __call__(self, raw_obs, action):
 
@@ -49,6 +49,7 @@ class LQRAgent:
                 cov=self.cov,
                 obs=obs,
             )
+
             action = (self.mean - target) @ self.Ks[self.step].T + self.ks[self.step].T
         
         self.step += 1
@@ -92,4 +93,4 @@ class LQRAgent:
     def reset(self):
         self.step = 0
         self.mean = torch.zeros((1, self.dfine.state_dim), device=self.device)
-        self.cov = torch.eye(self.dfine.state_dim, device=self.device)
+        self.cov = torch.eye(self.dfine.state_dim, device=self.device).unsqueeze(0)

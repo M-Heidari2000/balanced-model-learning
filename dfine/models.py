@@ -1,5 +1,4 @@
 import torch
-import einops
 import torch.nn as nn
 from typing import Optional
 
