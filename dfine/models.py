@@ -5,7 +5,7 @@ from typing import Optional
 
 class Encoder(nn.Module):
     """
-        o_t -> z_t
+        z_t -> o_t
     """
 
     def __init__(
@@ -29,6 +29,33 @@ class Encoder(nn.Module):
     def forward(self, raw_obs):
         return self.mlp_layers(raw_obs)
     
+
+class Decoder(nn.Module):
+    """
+        o_t -> z_t
+    """
+
+    def __init__(
+        self,
+        obs_dim: int,
+        raw_obs_dim: int,
+        hidden_dim: Optional[int]=None,
+    ):
+        super().__init__()
+
+        hidden_dim = hidden_dim if hidden_dim is not None else 2 * obs_dim
+
+        self.mlp_layers = nn.Sequential(
+            nn.Linear(obs_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, raw_obs_dim),
+        )
+
+    def forward(self, obs):
+        return self.mlp_layers(obs)
+
 
 class Dfine(nn.Module):
     
