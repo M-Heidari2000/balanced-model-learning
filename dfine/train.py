@@ -46,13 +46,15 @@ def train(env: gym.Env, config: TrainConfig):
     encoder = Encoder(
         raw_obs_dim=env.observation_space.shape[0],
         obs_dim=config.obs_dim,
-        hidden_dim=config.hidden_dim
+        hidden_dim=config.hidden_dim,
+        dropout_p=config.dropout_p,
     ).to(device)
 
     decoder = Decoder(
         raw_obs_dim=env.observation_space.shape[0],
         obs_dim=config.obs_dim,
-        hidden_dim=config.hidden_dim
+        hidden_dim=config.hidden_dim,
+        dropout_p=config.dropout_p,
     ).to(device)
 
     dfine = Dfine(
@@ -83,15 +85,20 @@ def train(env: gym.Env, config: TrainConfig):
             obs = next_obs
 
     for update in range(config.num_updates):
+
+        encoder.train()
+        decoder.train()
+        dfine.train()
+
         raw_observations, actions, _, _ = replay_buffer.sample(
             batch_size=config.batch_size,
             chunk_length=config.chunk_length,
         )
 
         raw_observations = torch.as_tensor(raw_observations, device=device)
-        raw_observations = einops.rearrange(raw_observations, 'b l o -> l b o')
-        observations = encoder(einops.rearrange(raw_observations, 'l b o -> (l b) o'))
-        observations = einops.rearrange(observations, '(b l) o -> l b o', b=config.batch_size)
+        raw_observations = einops.rearrange(raw_observations, 'b l z -> l b z')
+        observations = encoder(einops.rearrange(raw_observations, 'l b z -> (l b) z'))
+        observations = einops.rearrange(observations, '(l b) o -> l b o', b=config.batch_size)
         actions = torch.as_tensor(actions, device=device)
         actions = einops.rearrange(actions, 'b l a -> l b a')
 
@@ -126,10 +133,12 @@ def train(env: gym.Env, config: TrainConfig):
                 pred_raw_obs[k] = decoder(pred_mean @ dfine.C.T)
 
             true_raw_obs = raw_observations[t+2: t+2+config.prediction_k]
-            true_raw_obs_flatten = einops.rearrange(true_raw_obs, "k b o -> (k b) o")
-            pred_raw_obs_flatten = einops.rearrange(pred_raw_obs, "k b o -> (k b) o")
+            true_raw_obs_flatten = einops.rearrange(true_raw_obs, "k b z -> (k b) z")
+            pred_raw_obs_flatten = einops.rearrange(pred_raw_obs, "k b z -> (k b) z")
 
             total_loss += criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
+
+        total_loss /= config.chunk_length - config.prediction_k - 1
 
         optimizer.zero_grad()
         total_loss.backward()

@@ -13,6 +13,7 @@ class Encoder(nn.Module):
         obs_dim: int,
         raw_obs_dim: int,
         hidden_dim: Optional[int]=None,
+        dropout_p: float=0.4,
     ):
         super().__init__()
 
@@ -21,8 +22,10 @@ class Encoder(nn.Module):
         self.mlp_layers = nn.Sequential(
             nn.Linear(raw_obs_dim, hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=dropout_p),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=dropout_p),
             nn.Linear(hidden_dim, obs_dim),
         )
 
@@ -40,6 +43,7 @@ class Decoder(nn.Module):
         obs_dim: int,
         raw_obs_dim: int,
         hidden_dim: Optional[int]=None,
+        dropout_p: float=0.4,
     ):
         super().__init__()
 
@@ -48,8 +52,10 @@ class Decoder(nn.Module):
         self.mlp_layers = nn.Sequential(
             nn.Linear(obs_dim, hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=dropout_p),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
+            nn.Dropout(p=dropout_p),
             nn.Linear(hidden_dim, raw_obs_dim),
         )
 
