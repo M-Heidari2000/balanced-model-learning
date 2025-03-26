@@ -82,9 +82,8 @@ class Dfine(nn.Module):
         self._min_var = min_var
 
         # Dynamics matrices
-        self.A = nn.Parameter(
-            torch.randn(self.state_dim, self.state_dim, device=self.device)
-        )
+        self.v = nn.Parameter(torch.randn(1, self.state_dim, device=self.device))
+        self.r = nn.Parameter(torch.randn(1, self.state_dim, device=self.device))
         self.B = nn.Parameter(
             torch.randn(self.state_dim, self.action_dim, device=self.device),
         )
@@ -99,6 +98,13 @@ class Dfine(nn.Module):
         # Observation noise covariance (diagonal)
         self.no = nn.Parameter(
             torch.randn(self.obs_dim, device=device)
+        )
+
+    @property
+    def A(self):
+        return (
+            torch.eye(self.state_dim, device=self.v.device)
+            + nn.functional.tanh(self.v).T @ nn.functional.tanh(self.r)
         )
 
     def dynamics_update(
