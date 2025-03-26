@@ -122,7 +122,8 @@ def train(env: gym.Env, config: TrainConfig):
         mean = torch.zeros((config.batch_size, config.state_dim), device=device)
         cov = torch.eye(config.state_dim, device=device).repeat([config.batch_size, 1, 1])
 
-        total_loss = 0
+        total_obs_loss = 0
+        total_raw_obs_loss = 0
 
         for t in range(config.chunk_length - config.prediction_k - 1):
             mean, cov = dfine.dynamics_update(
@@ -137,6 +138,7 @@ def train(env: gym.Env, config: TrainConfig):
             )
 
             pred_raw_obs = torch.zeros((config.prediction_k, config.batch_size, env.observation_space.shape[0]), device=device)
+            pred_obs = torch.zeros((config.prediction_k, config.batch_size, config.obs_dim), device=device)
 
             pred_mean = mean
             pred_cov = cov
@@ -147,22 +149,31 @@ def train(env: gym.Env, config: TrainConfig):
                     cov=pred_cov,
                     action=actions[t+k+1]
                 )
+                pred_obs[k] = pred_mean @ dfine.C.T
                 pred_raw_obs[k] = decoder(pred_mean @ dfine.C.T)
 
             true_raw_obs = raw_observations[t+2: t+2+config.prediction_k]
             true_raw_obs_flatten = einops.rearrange(true_raw_obs, "k b z -> (k b) z")
             pred_raw_obs_flatten = einops.rearrange(pred_raw_obs, "k b z -> (k b) z")
+            true_obs = observations[t+2: t+2+config.prediction_k]
+            true_obs_flatten = einops.rearrange(true_obs, "k b o -> (k b) o")
+            pred_obs_flatten = einops.rearrange(pred_obs, "k b o -> (k b) o")
 
-            total_loss += criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
+            total_raw_obs_loss = criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
+            total_obs_loss = criterion(pred_obs_flatten, true_obs_flatten)
 
-        total_loss /= config.chunk_length - config.prediction_k - 1
+        total_raw_obs_loss /= config.chunk_length - config.prediction_k - 1
+        total_obs_loss /= config.chunk_length - config.prediction_k - 1
 
+        total_loss =  total_raw_obs_loss + config.obs_prediction_weight * total_obs_loss
+        
         optimizer.zero_grad()
         total_loss.backward()
         clip_grad_norm_(all_params, config.clip_grad_norm)
         optimizer.step()
 
-        writer.add_scalar("train_loss", total_loss.item(), update)
+        writer.add_scalar("obs loss train", total_obs_loss.item(), update)
+        writer.add_scalar("raw obs loss train", total_raw_obs_loss.item(), update)
         print(f"update step: {update+1}, train_loss: {total_loss.item()}")
 
         # test
@@ -172,7 +183,6 @@ def train(env: gym.Env, config: TrainConfig):
             decoder.eval()
 
             with torch.no_grad():
-
                 raw_observations, actions, _, _ = test_replay_buffer.sample(
                     batch_size=config.batch_size,
                     chunk_length=config.chunk_length,
@@ -188,7 +198,8 @@ def train(env: gym.Env, config: TrainConfig):
                 mean = torch.zeros((config.batch_size, config.state_dim), device=device)
                 cov = torch.eye(config.state_dim, device=device).repeat([config.batch_size, 1, 1])
 
-                total_loss = 0
+                total_obs_loss = 0
+                total_raw_obs_loss = 0
 
                 for t in range(config.chunk_length - config.prediction_k - 1):
                     mean, cov = dfine.dynamics_update(
@@ -203,6 +214,7 @@ def train(env: gym.Env, config: TrainConfig):
                     )
 
                     pred_raw_obs = torch.zeros((config.prediction_k, config.batch_size, env.observation_space.shape[0]), device=device)
+                    pred_obs = torch.zeros((config.prediction_k, config.batch_size, config.obs_dim), device=device)
 
                     pred_mean = mean
                     pred_cov = cov
@@ -213,17 +225,26 @@ def train(env: gym.Env, config: TrainConfig):
                             cov=pred_cov,
                             action=actions[t+k+1]
                         )
+                        pred_obs[k] = pred_mean @ dfine.C.T
                         pred_raw_obs[k] = decoder(pred_mean @ dfine.C.T)
 
                     true_raw_obs = raw_observations[t+2: t+2+config.prediction_k]
                     true_raw_obs_flatten = einops.rearrange(true_raw_obs, "k b z -> (k b) z")
                     pred_raw_obs_flatten = einops.rearrange(pred_raw_obs, "k b z -> (k b) z")
+                    true_obs = observations[t+2: t+2+config.prediction_k]
+                    true_obs_flatten = einops.rearrange(true_obs, "k b o -> (k b) o")
+                    pred_obs_flatten = einops.rearrange(pred_obs, "k b o -> (k b) o")
 
-                    total_loss += criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
+                    total_raw_obs_loss = criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
+                    total_obs_loss = criterion(pred_obs_flatten, true_obs_flatten)
 
-                total_loss /= config.chunk_length - config.prediction_k - 1
+                total_raw_obs_loss /= config.chunk_length - config.prediction_k - 1
+                total_obs_loss /= config.chunk_length - config.prediction_k - 1
 
-                writer.add_scalar("test_loss", total_loss.item(), update)
+                total_loss =  total_raw_obs_loss + config.obs_prediction_weight * total_obs_loss
+                
+                writer.add_scalar("obs loss test", total_obs_loss.item(), update)
+                writer.add_scalar("raw obs loss test", total_raw_obs_loss.item(), update)
                 print(f"update step: {update+1}, test_loss: {total_loss.item()}")
 
 

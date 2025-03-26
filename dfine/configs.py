@@ -14,6 +14,7 @@ class TrainConfig:
     num_train_episodes: int = 100
     num_test_episodes: int = 10
     test_interval: int = 10
+    obs_prediction_weight: float=1.0
     num_updates: int = 100
     chunk_length: int = 10
     prediction_k: int = 4
