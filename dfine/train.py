@@ -235,8 +235,8 @@ def train(env: gym.Env, config: TrainConfig):
                     true_obs_flatten = einops.rearrange(true_obs, "k b o -> (k b) o")
                     pred_obs_flatten = einops.rearrange(pred_obs, "k b o -> (k b) o")
 
-                    total_raw_obs_loss = criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
-                    total_obs_loss = criterion(pred_obs_flatten, true_obs_flatten)
+                    total_raw_obs_loss += criterion(pred_raw_obs_flatten, true_raw_obs_flatten)
+                    total_obs_loss += criterion(pred_obs_flatten, true_obs_flatten)
 
                 total_raw_obs_loss /= config.chunk_length - config.prediction_k - 1
                 total_obs_loss /= config.chunk_length - config.prediction_k - 1
